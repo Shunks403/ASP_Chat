@@ -2,6 +2,7 @@
 using System.Text;
 using MessangerBackend.Core.Interfaces;
 using MessangerBackend.Core.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace MessangerBackend.Core.Services;
 
@@ -14,60 +15,72 @@ public class UserService : IUserService
         _repository = repository;
     }
 
-    public async Task<User> Login(string nickname, string password)
+    public Task<User> Login(string nickname, string password)
     {
-        var user = await _repository.GetByNicknameAsync<User>(nickname);
+        if (nickname == null || string.IsNullOrEmpty(nickname.Trim()) || 
+            password == null || string.IsNullOrEmpty(password.Trim()))
+        {
+            throw new ArgumentNullException();
+        }
+        var user = _repository.GetAll<User>()
+            .SingleOrDefault(x => x.Nickname == nickname && x.Password == ComputeHash(password));
 
         if (user == null)
         {
-            throw new UnauthorizedAccessException("Invalid nickname or password.");
+            throw new InvalidOperationException("User not found or incorrect password.");
         }
-
-        if (!VerifyPassword(password, user.PasswordHash, user.PasswordSalt))
-        {
-            throw new UnauthorizedAccessException("Invalid nickname or password.");
-        }
-
-        user.LastSeenOnline = DateTime.UtcNow;
-        _repository.Update(user);
-
-        return user;
+        
+        return Task.FromResult(user);
+        
     }
 
     public async Task<User> Register(string nickname, string password)
     {
-        
-        if (string.IsNullOrWhiteSpace(nickname) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(nickname))
         {
-            throw new ArgumentException("Nickname and password cannot be empty.");
+            throw new ArgumentException("Nickname cannot be null or whitespace.");
         }
 
-        if (password.Length < 6)
+        if (string.IsNullOrWhiteSpace(password))
         {
-            throw new ArgumentException("Password must be at least 6 characters long.");
+            throw new ArgumentException("Password cannot be null or whitespace.");
         }
 
-        if (await _repository.GetByNicknameAsync<User>(nickname) != null)
+        if (nickname.Length < 3) 
         {
-            throw new ArgumentException("Nickname is already taken.");
+            throw new ArgumentException("Nickname is too short.");
         }
 
-        var (passwordHash, passwordSalt) = CreatePasswordHash(password);
+        if (password.Length < 6) 
+        {
+            throw new ArgumentException("Password is too short.");
+        }
 
-        var user = new User
+        if (password.All(char.IsLetter))
+        {
+            throw new ArgumentException("You can`t use only letters in password.");
+        }
+        var user = new User()
         {
             Nickname = nickname,
-            PasswordHash = passwordHash,
-            PasswordSalt = passwordSalt,
+            Password = ComputeHash(password),
             CreatedAt = DateTime.UtcNow,
             LastSeenOnline = DateTime.UtcNow,
-            Chats = new List<Chat>() 
         };
 
-        
-        await _repository.Add(user);
+        return await _repository.Add(user);
+    }
 
-        return user;
+    public async Task AddStats(string nickname)
+    {
+        var stats = _repository.GetAll<Stats>().FirstOrDefault(x => x.Name == nickname);
+        if (stats == null)
+            await _repository.Add(new Stats() { Name = nickname, Count = 1 });
+        else
+        {
+            stats.Count++;
+            await _repository.Update(stats);
+        }
     }
 
     public Task<User> GetUserById(int id)
@@ -77,32 +90,32 @@ public class UserService : IUserService
 
     public IEnumerable<User> GetUsers(int page, int size)
     {
-        throw new NotImplementedException();
-    }
-
-    public IEnumerable<User> SearchUsers(string nickname)
-    {
-        throw new NotImplementedException();
+        return _repository.GetAll<User>().Skip((page - 1) * size).Take(size).ToList();
     }
     
    
-    private (byte[] passwordHash, byte[] passwordSalt) CreatePasswordHash(string password)
+
+    public IEnumerable<User> SearchUsers(string nickname)
     {
-        using (var hmac = new HMACSHA512())
-        {
-            var salt = hmac.Key;
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return (hash, salt);
-        }
+        return _repository.GetAll<User>().Where(x => x.Nickname.ToLower().Contains(nickname.ToLower()));
     }
 
    
-    private bool VerifyPassword(string password, byte[] storedHash, byte[] storedSalt)
+
+
+    private string ComputeHash(string data)
     {
-        using (var hmac = new HMACSHA512(storedSalt))
-        {
-            var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return computedHash.SequenceEqual(storedHash);
-        }
+        var sha = SHA256.Create();
+        var salt = "t5Y_@d:d";
+        
+        var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(data + salt));
+
+        return Convert.ToBase64String(bytes);
     }
+    
+    // якщо нікнейм коректний 
+    // якщо нікнейм пустий 
+    // якщо немає такого нікнейму
+    // якщо нікнейм є частиною чиєгось нікнейму (User { Nickname = "TestDevUser" }, nickname = "Dev")
+    // різні регістри (User { Nickname = "User" }, nickname = "user")
 }

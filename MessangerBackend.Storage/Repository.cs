@@ -1,7 +1,5 @@
 ﻿using System.Linq.Expressions;
 using MessangerBackend.Core.Interfaces;
-using MessangerBackend.Core.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace MessangerBackend.Storage;
 
@@ -14,14 +12,18 @@ public class Repository : IRepository
         _context = context;
     }
 
-    public Task<T> Add<T>(T entity) where T : class
+    public async Task<T> Add<T>(T entity) where T : class
     {
-        throw new NotImplementedException();
+        var entityFromFb = _context.Set<T>().Add(entity);
+        await _context.SaveChangesAsync();
+        return entityFromFb.Entity;
     }
 
-    public Task<T> Update<T>(T entity) where T : class
+    public async Task<T> Update<T>(T entity) where T : class
     {
-        throw new NotImplementedException();
+        var updated = _context.Update(entity);
+        await _context.SaveChangesAsync();
+        return updated.Entity;
     }
 
     public Task<T> Delete<T>(int id) where T : class
@@ -34,18 +36,13 @@ public class Repository : IRepository
         throw new NotImplementedException();
     }
 
-    public IQueryable GetAll<T>() where T : class
+    public IQueryable<T> GetAll<T>() where T : class
     {
-        throw new NotImplementedException();
+        return _context.Set<T>();
     }
 
     public async Task<IEnumerable<T>> GetQuery<T>(Expression<Func<T, bool>> func) where T : class
     {
         return _context.Set<T>().Where(func);
-    }
-    
-    public async Task<T> GetByNicknameAsync<T>(string nickname) where T : class, IUserWithNickname
-    {
-        return await _context.Set<T>().SingleOrDefaultAsync(u => u.Nickname == nickname);
     }
 }

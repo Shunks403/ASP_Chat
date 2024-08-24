@@ -21,4 +21,6 @@ public class MessangerContext : DbContext
     public DbSet<Attachment> Attachments { get; set; }
     public DbSet<PrivateChat> PrivateChats { get; set; }
     public DbSet<GroupChat> GroupChats { get; set; }
+    public DbSet<Stats> Stats { get; set; }
+    public DbSet<SearchStatistic> SearchStatistics { get; set; }
 }
