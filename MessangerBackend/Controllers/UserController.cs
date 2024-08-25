@@ -23,6 +23,7 @@ public class UserController : Controller
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<UserDTO>>> GetUsers([FromQuery] int page, [FromQuery] int size)
     {
         var users = _userService.GetUsers(page, size);
@@ -30,6 +31,7 @@ public class UserController : Controller
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<UserDTO>> GetUserById(int id)
     {
         return Ok(_mapper.Map<UserDTO>(await _userService.GetUserById(id)));

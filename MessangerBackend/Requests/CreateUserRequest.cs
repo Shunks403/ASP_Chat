@@ -9,4 +9,6 @@ public class CreateUserRequest
     
     //[RegularExpression("^.*(?=.{8,})(?=.*[a-zA-Z])(?=.*\\d)(?=.*[!#$%&? \"]).*$")]
     public string Password { get; set; }
+
+    public string role { get; set; }
 }
